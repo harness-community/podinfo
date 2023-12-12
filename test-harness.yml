@@ -1,0 +1,140 @@
+pipeline:
+  identifier: podinfotest
+  name: podinfo_test/
+  orgIdentifier: December_2023
+  projectIdentifier: wyatt_munson
+  properties:
+    ci:
+      codebase:
+        build: <+input>
+        connectorRef: dockerconnector
+        repoName: podinfo
+  stages:
+  - stage:
+      identifier: test
+      name: test
+      spec:
+        cloneCodebase: true
+        execution:
+          steps:
+          - step:
+              identifier: setupgo
+              name: Setup Go
+              spec:
+                uses: actions/setup-go@v4
+                with:
+                  cache-dependency-path: |
+                    **/go.sum
+                    **/go.mod
+                  go-version: 1.21.x
+              timeout: ""
+              type: Action
+          - step:
+              identifier: setupkubectl
+              name: Setup kubectl
+              spec:
+                uses: azure/setup-kubectl@v3
+                with:
+                  version: v${{ env.KUBERNETES_VERSION }}
+              timeout: ""
+              type: Action
+          - step:
+              identifier: setupkubeconform
+              name: Setup kubeconform
+              spec:
+                uses: ./.github/actions/kubeconform
+              timeout: ""
+              type: Action
+          - step:
+              identifier: setuphelm
+              name: Setup Helm
+              spec:
+                uses: azure/setup-helm@v3
+                with:
+                  version: v3.10.3
+              timeout: ""
+              type: Action
+          - step:
+              identifier: setupcue
+              name: Setup CUE
+              spec:
+                uses: cue-lang/setup-cue@v1.0.0
+              timeout: ""
+              type: Action
+          - step:
+              identifier: setuptimoni
+              name: Setup Timoni
+              spec:
+                uses: stefanprodan/timoni/actions/setup@main
+              timeout: ""
+              type: Action
+          - step:
+              identifier: rununittests
+              name: Run unit tests
+              spec:
+                command: make test
+              timeout: ""
+              type: Run
+          - step:
+              identifier: validatehelmchart
+              name: Validate Helm chart
+              spec:
+                command: |
+                  helm lint ./charts/podinfo/
+                  helm template ./charts/podinfo/ | kubeconform -strict -summary -kubernetes-version ${{ env.KUBERNETES_VERSION }}
+              timeout: ""
+              type: Run
+          - step:
+              identifier: validatekustomizeoverlay
+              name: Validate Kustomize overlay
+              spec:
+                command: |
+                  kubectl kustomize ./kustomize/ | kubeconform -strict -summary -kubernetes-version ${{ env.KUBERNETES_VERSION }}
+              timeout: ""
+              type: Run
+          - step:
+              identifier: verifycueformatting
+              name: Verify CUE formatting
+              spec:
+                command: |
+                  cue fmt ./..
+                  status=$(git status . --porcelain)
+                  [[ -z "$status" ]] || {
+                    echo "CUE files are not correctly formatted"
+                    echo "$status"
+                    git diff
+                    exit 1
+                  }
+              timeout: ""
+              type: Run
+          - step:
+              identifier: validatetimonimodule
+              name: Validate Timoni module
+              spec:
+                command: "timoni mod lint . \ntimoni build podinfo . -f test_values.cue
+                  | kubeconform -strict -summary -skip=ServiceMonitor -kubernetes-version
+                  ${{ env.KUBERNETES_VERSION }}\n"
+              timeout: ""
+              type: Run
+          - step:
+              identifier: checkifworkingtreeisdirty
+              name: Check if working tree is dirty
+              spec:
+                command: |
+                  if [[ $(git diff --stat) != '' ]]; then
+                    echo 'run make test and commit changes'
+                    exit 1
+                  fi
+              timeout: ""
+              type: Run
+        platform:
+          arch: Amd64
+          os: Linux
+        runtime:
+          spec: {}
+          type: Cloud
+      type: CI
+  variables:
+  - name: KUBERNETES_VERSION
+    type: String
+    value: 1.26.0
