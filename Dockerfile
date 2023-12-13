@@ -8,8 +8,8 @@ COPY . .
 
 RUN go mod download
 
-ARG REVISION
 
+ARG REVISION
 RUN CGO_ENABLED=0 go build -ldflags "-s -w \
     -X github.com/stefanprodan/podinfo/pkg/version.REVISION=${REVISION}" \
     -a -o bin/podinfo cmd/podinfo/*
