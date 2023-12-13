@@ -1,7 +1,5 @@
 FROM golang:1.21-alpine as builder
 
-ARG REVISION
-
 RUN mkdir -p /podinfo/
 
 WORKDIR /podinfo
@@ -9,6 +7,8 @@ WORKDIR /podinfo
 COPY . .
 
 RUN go mod download
+
+ARG REVISION
 
 RUN CGO_ENABLED=0 go build -ldflags "-s -w \
     -X github.com/stefanprodan/podinfo/pkg/version.REVISION=${REVISION}" \
