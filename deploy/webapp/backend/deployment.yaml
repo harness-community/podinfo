@@ -23,9 +23,11 @@ spec:
         app: backend
     spec:
       serviceAccountName: webapp
+      imagePullSecrets:
+        - name: harness-registry-secret
       containers:
       - name: backend
-        image: ghcr.io/stefanprodan/podinfo:6.6.1
+        image: ${BACKEND_IMAGE}
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
